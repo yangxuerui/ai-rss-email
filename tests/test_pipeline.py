@@ -46,13 +46,14 @@ def test_pipeline_full_flow(mock_agent, mock_send, tmp_path):
     mock_send.assert_called_once()
 
 
+@patch("src.main._fallback_summarize", return_value="")
 @patch("src.main.send_email")
 @patch("src.main.run_agent")
-def test_pipeline_agent_failure_does_not_crash(mock_agent, mock_send, tmp_path):
+def test_pipeline_agent_failure_does_not_crash(mock_agent, mock_send, mock_fallback, tmp_path):
     mock_agent.side_effect = RuntimeError("Agent crashed")
     config = make_test_config(tmp_path)
     run_pipeline(config)  # Should not raise
-    mock_send.assert_not_called()
+    mock_fallback.assert_called_once()  # Fallback was attempted
 
 
 @patch("src.main.send_email")

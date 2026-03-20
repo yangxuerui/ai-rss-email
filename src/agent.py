@@ -144,24 +144,28 @@ def run_agent(config: Config) -> str:
     messages = [{"role": "user", "content": "请生成今天的 AI 日报。"}]
     tool_call_count = 0
     start_time = time.time()
+    force_stop_sent = False
 
     while True:
-        # Safety: max tool calls
-        if tool_call_count >= config.max_tool_calls:
-            logger.warning(f"Max tool calls ({config.max_tool_calls}) reached, forcing completion")
-            messages.append({
-                "role": "user",
-                "content": "已达到最大工具调用次数，请用已收集的信息立即生成日报。不要再调用工具。",
-            })
+        # Safety: check limits and force stop if needed
+        limit_hit = (
+            tool_call_count >= config.max_tool_calls
+            or (time.time() - start_time) > config.max_runtime_seconds
+        )
 
-        # Safety: max runtime
-        elapsed = time.time() - start_time
-        if elapsed > config.max_runtime_seconds:
-            logger.warning(f"Max runtime ({config.max_runtime_seconds}s) exceeded, forcing completion")
+        if limit_hit and force_stop_sent:
+            # Already asked Claude to stop but it's still calling tools — hard exit
+            logger.warning("Force stop already sent but Claude still calling tools, extracting text")
+            text_parts = [b.text for b in response.content if hasattr(b, "text")]
+            return "\n".join(text_parts) if text_parts else ""
+
+        if limit_hit and not force_stop_sent:
+            logger.warning(f"Safety limit hit (calls={tool_call_count}, elapsed={time.time() - start_time:.0f}s), requesting completion")
             messages.append({
                 "role": "user",
-                "content": "已超时，请立即用已收集的信息生成日报。不要再调用工具。",
+                "content": "已达到限制，请用已收集的信息立即生成日报。不要再调用工具。",
             })
+            force_stop_sent = True
 
         response = client.messages.create(
             model=config.claude_model,
@@ -172,6 +176,12 @@ def run_agent(config: Config) -> str:
         )
 
         if response.stop_reason == "tool_use":
+            if force_stop_sent:
+                # Claude ignored our stop request — hard exit with any text it produced
+                logger.warning("Claude ignored force stop, hard terminating")
+                text_parts = [b.text for b in response.content if hasattr(b, "text")]
+                return "\n".join(text_parts) if text_parts else ""
+
             # Preserve full response including text blocks (Claude's reasoning)
             messages.append({"role": "assistant", "content": response.content})
 
