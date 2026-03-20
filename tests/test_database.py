@@ -77,3 +77,49 @@ def test_cleanup_old_records(tmp_path):
     db.cleanup(days=3)
 
     assert db.article_exists(article.url_hash) is False
+
+
+def test_cleanup_preserves_unsent_articles(tmp_path):
+    """Cleanup must NOT delete old articles that haven't been sent yet."""
+    db = Database(str(tmp_path / "test.db"))
+    db.init()
+    article = make_article()
+    db.insert_article(article)
+    # Do NOT mark as sent — leave sent_at NULL
+
+    # Backdate fetched_at to 5 days ago
+    db._execute(
+        "UPDATE articles SET fetched_at = ? WHERE url_hash = ?",
+        (datetime.now(timezone.utc) - timedelta(days=5), article.url_hash),
+    )
+    db.cleanup(days=3)
+
+    # Article should still exist because it was never sent
+    assert db.article_exists(article.url_hash) is True
+
+
+def test_cleanup_old_digests(tmp_path):
+    """Cleanup deletes old sent digests but preserves unsent ones."""
+    db = Database(str(tmp_path / "test.db"))
+    db.init()
+
+    # Sent digest — old, should be cleaned up
+    sent_id = db.save_digest("Sent Digest", "<h1>Sent</h1>")
+    db.mark_digest_sent(sent_id)
+    db._execute(
+        "UPDATE digests SET created_at = ? WHERE id = ?",
+        (datetime.now(timezone.utc) - timedelta(days=5), sent_id),
+    )
+
+    # Unsent digest — old, should be preserved
+    unsent_id = db.save_digest("Unsent Digest", "<h1>Unsent</h1>")
+    db._execute(
+        "UPDATE digests SET created_at = ? WHERE id = ?",
+        (datetime.now(timezone.utc) - timedelta(days=5), unsent_id),
+    )
+
+    db.cleanup(days=3)
+
+    unsent = db.get_unsent_digests()
+    assert len(unsent) == 1
+    assert unsent[0]["id"] == unsent_id
