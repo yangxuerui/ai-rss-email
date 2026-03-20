@@ -1,0 +1,14 @@
+[Unit]
+Description=AI RSS Email Daily Digest
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ai-rss-email
+ExecStart=/opt/ai-rss-email/venv/bin/python -m src.main
+Restart=on-failure
+RestartSec=30
+EnvironmentFile=/opt/ai-rss-email/.env
+
+[Install]
+WantedBy=multi-user.target
