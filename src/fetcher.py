@@ -1,16 +1,20 @@
 # src/fetcher.py
 import asyncio
 import logging
+import ssl
 from datetime import datetime, timezone
 from time import mktime
 
 import aiohttp
+import certifi
 import feedparser
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.models import Article, create_article
 
 logger = logging.getLogger(__name__)
+
+_ssl_context = ssl.create_default_context(cafile=certifi.where())
 
 
 async def fetch_twitter_rss(
@@ -80,7 +84,8 @@ async def fetch_all(
     """Fetch all configured RSS feeds. Twitter concurrently, Reddit sequentially."""
     articles: list[Article] = []
 
-    async with aiohttp.ClientSession() as session:
+    connector = aiohttp.TCPConnector(ssl=_ssl_context)
+    async with aiohttp.ClientSession(connector=connector) as session:
         # Twitter: concurrent fetching
         twitter_tasks = [
             fetch_twitter_rss(session, rsshub_instances, account)
