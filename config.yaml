@@ -1,17 +1,4 @@
 sources:
-  twitter:
-    rsshub_instances:
-      - "https://rsshub.app"
-      - "https://rsshub.rssforever.com"
-    accounts:
-      - openai
-      - AnthropicAI
-      - GoogleDeepMind
-      - MetaAI
-      - _akhaliq
-      - kaboroevich
-      - huggingface
-      - LangChainAI
   reddit:
     subreddits:
       - MachineLearning
@@ -24,15 +11,23 @@ email:
   smtp_host: "smtp.gmail.com"
   smtp_port: 587
   recipients:
-    - "user1@gmail.com"
+    - "yangxuerui0103@gmail.com"
+    - "yangxuerui0103@163.com"
 
 schedule:
   cron: "0 8 * * *"
   timezone: "Asia/Shanghai"
 
 claude:
-  model: "claude-sonnet-4-latest"
-  max_tokens: 4096
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 8192
+
+agent:
+  max_tool_calls: 15
+  max_runtime_seconds: 300
+
+exa:
+  default_num_results: 10
 
 database:
   path: "data/articles.db"
