@@ -1,5 +1,4 @@
 # src/fetcher.py
-import asyncio
 import logging
 import ssl
 from datetime import datetime, timezone
@@ -15,31 +14,6 @@ from src.models import Article, create_article
 logger = logging.getLogger(__name__)
 
 _ssl_context = ssl.create_default_context(cafile=certifi.where())
-
-
-async def fetch_twitter_rss(
-    session: aiohttp.ClientSession,
-    rsshub_instances: list[str],
-    account: str,
-) -> list[Article]:
-    """Fetch RSS feed for a Twitter account via RSSHub instances with fallback."""
-    for instance in rsshub_instances:
-        url = f"{instance.rstrip('/')}/twitter/user/{account}"
-        try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                if resp.status != 200:
-                    logger.warning(
-                        "RSSHub %s returned %d for %s", instance, resp.status, account
-                    )
-                    continue
-                text = await resp.text()
-                return _parse_feed(text, source="twitter", source_name=account)
-        except Exception as e:
-            logger.warning("RSSHub %s failed for %s: %s", instance, account, e)
-            continue
-
-    logger.error("All RSSHub instances failed for %s", account)
-    return []
 
 
 async def fetch_reddit_rss(
@@ -73,40 +47,6 @@ async def _fetch_reddit_with_retry(
             return []
         text = await resp.text()
         return _parse_feed(text, source="reddit", source_name=subreddit)
-
-
-async def fetch_all(
-    rsshub_instances: list[str],
-    twitter_accounts: list[str],
-    reddit_subreddits: list[str],
-    reddit_user_agent: str,
-) -> list[Article]:
-    """Fetch all configured RSS feeds. Twitter concurrently, Reddit sequentially."""
-    articles: list[Article] = []
-
-    connector = aiohttp.TCPConnector(ssl=_ssl_context)
-    async with aiohttp.ClientSession(connector=connector) as session:
-        # Twitter: concurrent fetching
-        twitter_tasks = [
-            fetch_twitter_rss(session, rsshub_instances, account)
-            for account in twitter_accounts
-        ]
-        twitter_results = await asyncio.gather(*twitter_tasks, return_exceptions=True)
-        for result in twitter_results:
-            if isinstance(result, list):
-                articles.extend(result)
-            else:
-                logger.error("Twitter fetch error: %s", result)
-
-        # Reddit: sequential with 1s delay to respect rate limits
-        for subreddit in reddit_subreddits:
-            result = await fetch_reddit_rss(session, subreddit, reddit_user_agent)
-            articles.extend(result)
-            if subreddit != reddit_subreddits[-1]:
-                await asyncio.sleep(1)
-
-    logger.info("Fetched %d total articles", len(articles))
-    return articles
 
 
 def _parse_feed(text: str, source: str, source_name: str) -> list[Article]:

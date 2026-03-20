@@ -1,18 +1,14 @@
 # src/main.py
-import asyncio
 import logging
 from datetime import date
 
-import anthropic
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from src.config import load_config, Config
 from src.database import Database
 from src.email_sender import generate_subject, render_email, send_email
-from src.fetcher import fetch_all
-from src.processor import process_articles
-from src.summarizer import summarize_articles
+from src.agent import run_agent
 
 logger = logging.getLogger(__name__)
 
@@ -22,44 +18,31 @@ def run_pipeline(config: Config) -> None:
     db.init()
 
     try:
-        # Step 1: Retry unsent digests (isolated — failure here won't block today's digest)
+        # Step 1: Retry unsent digests
         try:
             _retry_unsent_digests(db, config)
         except Exception as e:
             logger.error(f"Retry unsent digests failed: {e}", exc_info=True)
 
-        # Step 2: Fetch
-        logger.info("Fetching RSS feeds...")
-        articles = asyncio.run(
-            fetch_all(
-                rsshub_instances=config.rsshub_instances,
-                twitter_accounts=config.twitter_accounts,
-                reddit_subreddits=config.reddit_subreddits,
-                reddit_user_agent=config.reddit_user_agent,
-            )
-        )
+        # Step 2: Run Agent
+        logger.info("Running Agent to generate digest...")
+        try:
+            summary_md = run_agent(config)
+        except Exception as e:
+            logger.error(f"Agent failed: {e}", exc_info=True)
+            summary_md = ""
 
-        # Step 3: Process
-        new_articles = process_articles(articles, db)
-
-        if not new_articles:
-            logger.info("No new articles found, skipping digest")
+        if not summary_md.strip():
+            logger.info("Agent produced no content, skipping digest")
             db.cleanup(config.cleanup_days)
             return
 
-        # Step 4: Summarize
-        logger.info(f"Summarizing {len(new_articles)} articles with Claude...")
-        client = anthropic.Anthropic(api_key=config.anthropic_api_key)
-        summary_md = summarize_articles(
-            new_articles, client, config.claude_model, config.max_tokens
-        )
-
-        # Step 5: Render
+        # Step 3: Render
         html_content = render_email(summary_md)
         subject = generate_subject(date.today(), _extract_highlight(summary_md))
         digest_id = db.save_digest(subject, html_content)
 
-        # Step 6: Send
+        # Step 4: Send
         logger.info(f"Sending digest to {len(config.recipients)} recipients...")
         send_email(
             smtp_host=config.smtp_host,
@@ -71,12 +54,9 @@ def run_pipeline(config: Config) -> None:
             html_content=html_content,
         )
 
-        # Step 7: Mark
-        db.mark_articles_sent([a.url_hash for a in new_articles])
+        # Step 5: Mark + Cleanup
         db.mark_digest_sent(digest_id)
         logger.info("Digest sent successfully")
-
-        # Step 8: Cleanup
         db.cleanup(config.cleanup_days)
 
     except Exception as e:
