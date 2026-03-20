@@ -22,8 +22,11 @@ def run_pipeline(config: Config) -> None:
     db.init()
 
     try:
-        # Step 1: Retry unsent digests
-        _retry_unsent_digests(db, config)
+        # Step 1: Retry unsent digests (isolated — failure here won't block today's digest)
+        try:
+            _retry_unsent_digests(db, config)
+        except Exception as e:
+            logger.error(f"Retry unsent digests failed: {e}", exc_info=True)
 
         # Step 2: Fetch
         logger.info("Fetching RSS feeds...")
@@ -120,16 +123,7 @@ def main() -> None:
     config = load_config()
     logger.info("AI RSS Email Agent started")
 
-    # Parse cron expression: "0 8 * * *"
-    cron_parts = config.schedule_cron.split()
-    trigger = CronTrigger(
-        minute=cron_parts[0],
-        hour=cron_parts[1],
-        day=cron_parts[2] if cron_parts[2] != "*" else None,
-        month=cron_parts[3] if cron_parts[3] != "*" else None,
-        day_of_week=cron_parts[4] if cron_parts[4] != "*" else None,
-        timezone=config.timezone,
-    )
+    trigger = CronTrigger.from_crontab(config.schedule_cron, timezone=config.timezone)
 
     scheduler = BlockingScheduler()
     scheduler.add_job(run_pipeline, trigger, args=[config], id="daily_digest")

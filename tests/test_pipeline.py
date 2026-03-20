@@ -89,3 +89,19 @@ def test_pipeline_retries_unsent_digests(mock_send, tmp_path):
     db2.init()
     assert len(db2.get_unsent_digests()) == 0
     db2.close()
+
+
+@patch("src.main.send_email")
+@patch("src.main.summarize_articles")
+@patch("src.main.fetch_all")
+def test_pipeline_exception_does_not_crash(mock_fetch, mock_summarize, mock_send, tmp_path):
+    """Pipeline exceptions are caught and logged, not propagated."""
+    async def mock_fetch_coro(*args, **kwargs):
+        return []
+
+    mock_fetch.side_effect = mock_fetch_coro
+    # Simulate an unexpected error in process_articles
+    with patch("src.main.process_articles", side_effect=RuntimeError("unexpected")):
+        config = make_test_config(tmp_path)
+        # Should not raise
+        run_pipeline(config)
