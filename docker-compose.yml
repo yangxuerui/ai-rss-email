@@ -1,0 +1,10 @@
+services:
+  ai-rss-email:
+    build: .
+    container_name: ai-rss-email
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
