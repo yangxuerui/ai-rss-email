@@ -1,6 +1,8 @@
 # src/config.py
 from dataclasses import dataclass
 
+import os
+
 import yaml
 from dotenv import dotenv_values
 
@@ -41,7 +43,7 @@ def load_config(
     with open(config_path) as f:
         yaml_data = yaml.safe_load(f)
 
-    env = dotenv_values(env_path)
+    env = {**dotenv_values(env_path), **os.environ}
 
     required_env = ["ANTHROPIC_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "EXA_API_KEY"]
     missing = [k for k in required_env if not env.get(k)]

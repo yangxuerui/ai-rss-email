@@ -1,4 +1,5 @@
 # tests/test_config.py
+from unittest.mock import patch
 from src.config import load_config
 
 SAMPLE_YAML = """
@@ -55,6 +56,7 @@ def test_load_config_from_yaml(tmp_path):
     assert config.max_tokens == 8192
 
 
+@patch.dict("os.environ", {}, clear=True)
 def test_load_config_missing_env_raises(tmp_path):
     config_file = tmp_path / "config.yaml"
     config_file.write_text(SAMPLE_YAML)
