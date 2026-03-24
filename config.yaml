@@ -13,6 +13,7 @@ email:
   recipients:
     - "yangxuerui0103@gmail.com"
     - "yangxuerui0103@163.com"
+    - "1950876114@qq.com"
 
 schedule:
   cron: "0 8 * * *"
@@ -20,7 +21,7 @@ schedule:
 
 llm:
   base_url: "https://open.bigmodel.cn/api/anthropic"
-  model: "glm-4.5-flash"
+  model: "glm-4.5"
   max_tokens: 8192
 
 agent:
