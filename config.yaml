@@ -18,8 +18,9 @@ schedule:
   cron: "0 8 * * *"
   timezone: "Asia/Shanghai"
 
-claude:
-  model: "claude-sonnet-4-20250514"
+llm:
+  base_url: "https://open.bigmodel.cn/api/anthropic"
+  model: "glm-4.5-flash"
   max_tokens: 8192
 
 agent:

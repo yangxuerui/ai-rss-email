@@ -118,8 +118,8 @@ def _fallback_summarize(config: Config, db: Database) -> str:
         if not new_articles:
             return ""
 
-        client = anthropic.Anthropic(api_key=config.anthropic_api_key)
-        return summarize_articles(new_articles, client, config.claude_model, config.max_tokens)
+        client = anthropic.Anthropic(api_key=config.llm_api_key, base_url=config.llm_base_url)
+        return summarize_articles(new_articles, client, config.llm_model, config.max_tokens)
     except Exception as e:
         logger.error(f"Fallback also failed: {e}", exc_info=True)
         return ""

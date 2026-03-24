@@ -19,8 +19,9 @@ schedule:
   cron: "0 8 * * *"
   timezone: "Asia/Shanghai"
 
-claude:
-  model: "claude-sonnet-4-20250514"
+llm:
+  base_url: "https://open.bigmodel.cn/api/anthropic"
+  model: "glm-4.5-flash"
   max_tokens: 8192
 
 agent:
@@ -41,7 +42,7 @@ def test_load_config_from_yaml(tmp_path):
     config_file.write_text(SAMPLE_YAML)
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "ANTHROPIC_API_KEY=sk-test-key\n"
+        "LLM_API_KEY=sk-test-key\n"
         "GMAIL_ADDRESS=sender@gmail.com\n"
         "GMAIL_APP_PASSWORD=test-password\n"
         "EXA_API_KEY=exa-test-key\n"
@@ -52,7 +53,7 @@ def test_load_config_from_yaml(tmp_path):
     assert config.max_tool_calls == 15
     assert config.max_runtime_seconds == 300
     assert config.exa_default_num_results == 10
-    assert config.claude_model == "claude-sonnet-4-20250514"
+    assert config.llm_model == "glm-4.5-flash"
     assert config.max_tokens == 8192
 
 
@@ -66,4 +67,4 @@ def test_load_config_missing_env_raises(tmp_path):
         load_config(str(config_file), str(env_file))
         assert False, "Should have raised ValueError"
     except ValueError as e:
-        assert "ANTHROPIC_API_KEY" in str(e)
+        assert "LLM_API_KEY" in str(e)

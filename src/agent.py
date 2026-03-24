@@ -138,7 +138,7 @@ def execute_tool(name: str, tool_input: dict, exa: Exa, config: Config) -> str:
 
 
 def run_agent(config: Config) -> str:
-    client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+    client = anthropic.Anthropic(api_key=config.llm_api_key, base_url=config.llm_base_url)
     exa = Exa(api_key=config.exa_api_key)
 
     messages = [{"role": "user", "content": "请生成今天的 AI 日报。"}]
@@ -168,7 +168,7 @@ def run_agent(config: Config) -> str:
             force_stop_sent = True
 
         response = client.messages.create(
-            model=config.claude_model,
+            model=config.llm_model,
             max_tokens=config.max_tokens,
             system=AGENT_SYSTEM_PROMPT,
             tools=TOOLS,
