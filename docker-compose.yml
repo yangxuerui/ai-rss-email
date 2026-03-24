@@ -1,5 +1,6 @@
 services:
   ai-rss-email:
+    image: ai-rss-email:latest
     build: .
     container_name: ai-rss-email
     restart: unless-stopped

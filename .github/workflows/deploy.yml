@@ -1,0 +1,85 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [main]
+
+env:
+  ACR_REGISTRY: crpi-va3hgqqrxznudqs0.cn-shanghai.personal.cr.aliyuncs.com
+  ACR_VPC_REGISTRY: crpi-va3hgqqrxznudqs0-vpc.cn-shanghai.personal.cr.aliyuncs.com
+  ACR_IMAGE: crpi-va3hgqqrxznudqs0.cn-shanghai.personal.cr.aliyuncs.com/opc_yangxuerui/ai-rss-email
+  ACR_VPC_IMAGE: crpi-va3hgqqrxznudqs0-vpc.cn-shanghai.personal.cr.aliyuncs.com/opc_yangxuerui/ai-rss-email
+
+jobs:
+  build-and-push:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Generate image tags
+        id: meta
+        run: |
+          SHA=$(echo $GITHUB_SHA | head -c 7)
+          echo "version=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Tags: ${SHA}, latest"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ACR_IMAGE }}:${{ steps.meta.outputs.version }}
+            ${{ env.ACR_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Server
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            # Login to ACR (VPC internal address)
+            docker login -u "${{ secrets.ACR_USERNAME }}" -p "${{ secrets.ACR_PASSWORD }}" ${{ env.ACR_VPC_REGISTRY }}
+
+            # Pull latest image via VPC
+            docker pull ${{ env.ACR_VPC_IMAGE }}:${{ needs.build-and-push.outputs.image_tag }}
+            docker tag ${{ env.ACR_VPC_IMAGE }}:${{ needs.build-and-push.outputs.image_tag }} ai-rss-email:latest
+
+            # Deploy
+            cd /opt/ai-rss-email
+            docker compose down
+            docker compose up -d
+
+            # Verify container is running
+            sleep 3
+            docker compose ps | grep -q "running" && echo "Deploy OK" || echo "Deploy FAILED"
+
+            # Cleanup old images
+            docker image prune -f
