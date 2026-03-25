@@ -13,7 +13,7 @@ from src.config import load_config, Config
 from src.database import Database
 from src.email_sender import generate_subject, render_email, send_email
 from src.agent import run_agent
-from src.fetcher import fetch_reddit_rss
+from src.fetcher import fetch_reddit_rss, fetch_rss_feed
 from src.processor import process_articles
 from src.summarizer import summarize_articles
 
@@ -106,10 +106,19 @@ def _fallback_summarize(config: Config, db: Database) -> str:
             connector = aiohttp.TCPConnector(ssl=ssl_ctx)
             async with aiohttp.ClientSession(connector=connector) as session:
                 all_articles = []
+                # Fetch Reddit via RSSHub
                 for sub in config.reddit_subreddits:
-                    articles = await fetch_reddit_rss(session, sub, config.reddit_user_agent)
+                    if config.rsshub_base_url:
+                        url = f"{config.rsshub_base_url.rstrip('/')}/reddit/subreddit/{sub}"
+                        articles = await fetch_rss_feed(session, url, source="reddit", source_name=sub)
+                    else:
+                        articles = await fetch_reddit_rss(session, sub, config.reddit_user_agent)
                     all_articles.extend(articles)
                     await asyncio.sleep(1)
+                # Fetch configured RSS feeds
+                for feed in config.rss_feeds:
+                    articles = await fetch_rss_feed(session, feed.url, source=feed.source, source_name=feed.name)
+                    all_articles.extend(articles)
                 return all_articles
 
         articles = asyncio.run(_fetch())

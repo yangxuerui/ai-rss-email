@@ -16,6 +16,29 @@ logger = logging.getLogger(__name__)
 _ssl_context = ssl.create_default_context(cafile=certifi.where())
 
 
+async def fetch_rss_feed(
+    session: aiohttp.ClientSession,
+    url: str,
+    source: str,
+    source_name: str,
+) -> list[Article]:
+    """Fetch a generic RSS/Atom feed and return Article objects."""
+    try:
+        async with session.get(
+            url,
+            headers={"User-Agent": "ai-rss-email/1.0"},
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as resp:
+            if resp.status != 200:
+                logger.warning("RSS feed %s returned %d", url, resp.status)
+                return []
+            text = await resp.text()
+            return _parse_feed(text, source=source, source_name=source_name)
+    except Exception as e:
+        logger.error("RSS fetch failed for %s: %s", url, e)
+        return []
+
+
 async def fetch_reddit_rss(
     session: aiohttp.ClientSession,
     subreddit: str,

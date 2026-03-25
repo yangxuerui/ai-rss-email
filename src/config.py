@@ -8,10 +8,21 @@ from dotenv import dotenv_values
 
 
 @dataclass(frozen=True)
+class RssFeedConfig:
+    name: str
+    url: str
+    source: str
+
+
+@dataclass(frozen=True)
 class Config:
+    # RSSHub
+    rsshub_base_url: str
     # Reddit
     reddit_subreddits: list[str]
     reddit_user_agent: str
+    # RSS Feeds
+    rss_feeds: list[RssFeedConfig]
     # Email
     smtp_host: str
     smtp_port: int
@@ -51,7 +62,10 @@ def load_config(
     if missing:
         raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
-    reddit = yaml_data.get("sources", {}).get("reddit", {})
+    sources = yaml_data.get("sources", {})
+    rsshub = sources.get("rsshub", {})
+    reddit = sources.get("reddit", {})
+    raw_feeds = sources.get("rss_feeds", [])
     email = yaml_data.get("email", {})
     schedule = yaml_data.get("schedule", {})
     llm = yaml_data.get("llm", {})
@@ -59,9 +73,26 @@ def load_config(
     exa = yaml_data.get("exa", {})
     database = yaml_data.get("database", {})
 
+    rsshub_base = rsshub.get("base_url", "")
+    rss_feeds = []
+    for feed in raw_feeds:
+        if "url" in feed:
+            url = feed["url"]
+        elif "url_path" in feed and rsshub_base:
+            url = rsshub_base.rstrip("/") + feed["url_path"]
+        else:
+            continue
+        rss_feeds.append(RssFeedConfig(
+            name=feed.get("name", ""),
+            url=url,
+            source=feed.get("source", "rss"),
+        ))
+
     return Config(
+        rsshub_base_url=rsshub_base,
         reddit_subreddits=reddit.get("subreddits", []),
         reddit_user_agent=reddit.get("user_agent", "ai-rss-email/1.0"),
+        rss_feeds=rss_feeds,
         smtp_host=email.get("smtp_host", "smtp.gmail.com"),
         smtp_port=email.get("smtp_port", 587),
         gmail_address=env["GMAIL_ADDRESS"],

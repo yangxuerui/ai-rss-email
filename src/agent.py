@@ -12,6 +12,7 @@ from src.tools import (
     execute_exa_search_tweets,
     execute_exa_get_contents,
     execute_fetch_reddit_rss,
+    execute_fetch_rss_feeds,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,9 +22,10 @@ AGENT_SYSTEM_PROMPT = """你是一个 AI 科技新闻 Agent。你的任务是收
 ## 工作流程
 
 1. **收集阶段**：使用工具搜索多个来源
+   - 用 fetch_rss_feeds 抓取所有已配置的 RSS 源（Hacker News、36kr、ArXiv、OpenAI、HuggingFace Papers）
+   - 用 fetch_reddit_rss 抓取 Reddit AI 社区的热帖（通过 RSSHub 代理）
    - 用 exa_search_news 搜索今日 AI 重大新闻（建议搜索 2-3 个不同关键词）
    - 用 exa_search_tweets 看看 Twitter 上的 AI 讨论热点
-   - 用 fetch_reddit_rss 抓取 Reddit AI 社区的热帖
 
 2. **验证阶段**：如果某条新闻需要更多背景
    - 用 exa_get_contents 获取原文详情
@@ -106,7 +108,7 @@ TOOLS = [
     },
     {
         "name": "fetch_reddit_rss",
-        "description": "抓取指定Reddit subreddit的热门帖子。返回标题、内容摘要和URL。",
+        "description": "抓取指定Reddit subreddit的热门帖子（通过RSSHub代理）。返回标题、内容摘要和URL。",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -117,6 +119,14 @@ TOOLS = [
                 },
             },
             "required": ["subreddits"],
+        },
+    },
+    {
+        "name": "fetch_rss_feeds",
+        "description": "抓取所有已配置的RSS源（Hacker News、36kr快讯、ArXiv AI论文、OpenAI博客、HuggingFace论文精选）。无需参数，自动抓取所有源。",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
         },
     },
 ]
@@ -132,7 +142,10 @@ def execute_tool(name: str, tool_input: dict, exa: Exa, config: Config) -> str:
     elif name == "exa_get_contents":
         return execute_exa_get_contents(exa, tool_input["urls"])
     elif name == "fetch_reddit_rss":
-        return execute_fetch_reddit_rss(tool_input["subreddits"], config.reddit_user_agent)
+        return execute_fetch_reddit_rss(tool_input["subreddits"], config.reddit_user_agent, config.rsshub_base_url)
+    elif name == "fetch_rss_feeds":
+        feeds = [{"url": f.url, "source": f.source, "name": f.name} for f in config.rss_feeds]
+        return execute_fetch_rss_feeds(feeds)
     else:
         return json.dumps({"error": f"Unknown tool: {name}"})
 

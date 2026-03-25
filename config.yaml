@@ -1,11 +1,27 @@
 sources:
+  rsshub:
+    base_url: "https://rsshub-nine-beta.vercel.app"
   reddit:
     subreddits:
       - MachineLearning
-      - artificial
       - LocalLLaMA
-      - ChatGPT
     user_agent: "ai-rss-email/1.0"
+  rss_feeds:
+    - name: "Hacker News Best"
+      url_path: "/hackernews/best/1"
+      source: "hackernews"
+    - name: "36kr 快讯"
+      url_path: "/36kr/newsflashes"
+      source: "36kr"
+    - name: "ArXiv AI"
+      url: "https://export.arxiv.org/rss/cs.AI"
+      source: "arxiv"
+    - name: "OpenAI Blog"
+      url: "https://openai.com/news/rss.xml"
+      source: "openai"
+    - name: "HuggingFace Papers"
+      url: "https://papers.takara.ai/api/feed"
+      source: "hf-papers"
 
 email:
   smtp_host: "smtp.163.com"

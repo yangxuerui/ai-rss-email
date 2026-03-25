@@ -9,7 +9,7 @@ import aiohttp
 import certifi
 from exa_py import Exa
 
-from src.fetcher import fetch_reddit_rss as _fetch_reddit_rss
+from src.fetcher import fetch_reddit_rss as _fetch_reddit_rss, fetch_rss_feed as _fetch_rss_feed
 
 logger = logging.getLogger(__name__)
 
@@ -60,33 +60,65 @@ def execute_exa_get_contents(exa: Exa, urls: list[str]) -> str:
         return json.dumps({"error": str(e), "suggestion": "skip this URL"})
 
 
-def execute_fetch_reddit_rss(subreddits: list[str], user_agent: str) -> str:
+def execute_fetch_reddit_rss(subreddits: list[str], user_agent: str, rsshub_base_url: str = "") -> str:
     try:
         async def _fetch():
             connector = aiohttp.TCPConnector(ssl=_ssl_context)
             async with aiohttp.ClientSession(connector=connector) as session:
                 all_articles = []
                 for sub in subreddits:
-                    articles = await _fetch_reddit_rss(session, sub, user_agent)
+                    if rsshub_base_url:
+                        url = f"{rsshub_base_url.rstrip('/')}/reddit/subreddit/{sub}"
+                        articles = await _fetch_rss_feed(session, url, source="reddit", source_name=sub)
+                    else:
+                        articles = await _fetch_reddit_rss(session, sub, user_agent)
                     all_articles.extend(articles)
                     if sub != subreddits[-1]:
                         await asyncio.sleep(1)
                 return all_articles
 
         articles = asyncio.run(_fetch())
-        items = [
-            {
-                "title": a.title,
-                "url": a.url,
-                "content": a.content[:500],
-                "source": f"reddit/r/{a.source_name}",
-            }
-            for a in articles
-        ]
-        return json.dumps(items, ensure_ascii=False)
+        return _format_articles(articles, source_prefix="reddit/r/")
     except Exception as e:
         logger.error(f"fetch_reddit_rss failed: {e}")
         return json.dumps({"error": str(e), "suggestion": "skip Reddit or try exa_search_news with Reddit topics"})
+
+
+def execute_fetch_rss_feeds(feeds: list[dict]) -> str:
+    """Fetch multiple RSS feeds. Each feed: {url, source, name}."""
+    try:
+        async def _fetch():
+            connector = aiohttp.TCPConnector(ssl=_ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                all_articles = []
+                for feed in feeds:
+                    articles = await _fetch_rss_feed(
+                        session,
+                        url=feed["url"],
+                        source=feed["source"],
+                        source_name=feed["name"],
+                    )
+                    all_articles.extend(articles)
+                return all_articles
+
+        articles = asyncio.run(_fetch())
+        return _format_articles(articles)
+    except Exception as e:
+        logger.error(f"fetch_rss_feeds failed: {e}")
+        return json.dumps({"error": str(e), "suggestion": "skip RSS feeds"})
+
+
+def _format_articles(articles, source_prefix: str = "") -> str:
+    items = [
+        {
+            "title": a.title,
+            "url": a.url,
+            "content": a.content[:500],
+            "source": f"{source_prefix}{a.source_name}" if source_prefix else f"{a.source}/{a.source_name}",
+        }
+        for a in articles
+    ]
+    return json.dumps(items, ensure_ascii=False)
 
 
 def _format_exa_results(results) -> str:
