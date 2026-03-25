@@ -78,8 +78,9 @@ jobs:
             docker compose up -d
 
             # Verify container is running
-            sleep 3
-            docker compose ps | grep -q "running" && echo "Deploy OK" || echo "Deploy FAILED"
+            sleep 5
+            docker compose ps
+            docker compose ps --format json | grep -qi "running" && echo "Deploy OK" || (echo "Deploy FAILED" && docker compose logs --tail 20 && exit 1)
 
             # Cleanup old images
             docker image prune -f
