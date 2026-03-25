@@ -39,8 +39,12 @@ def send_email(
     subject: str,
     html_content: str,
 ) -> None:
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
+    if smtp_port == 465:
+        server = smtplib.SMTP_SSL(smtp_host, smtp_port)
+    else:
+        server = smtplib.SMTP(smtp_host, smtp_port)
         server.starttls()
+    with server:
         server.login(sender, password)
 
         for recipient in recipients:

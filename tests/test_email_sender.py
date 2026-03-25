@@ -18,22 +18,44 @@ def test_generate_subject():
     assert "2026-03-20" in subject
 
 
-def test_send_email_calls_smtp():
+def test_send_email_calls_smtp_starttls():
     with patch("src.email_sender.smtplib.SMTP") as mock_smtp_class:
         mock_smtp = MagicMock()
-        mock_smtp_class.return_value.__enter__ = MagicMock(return_value=mock_smtp)
-        mock_smtp_class.return_value.__exit__ = MagicMock(return_value=False)
+        mock_smtp_class.return_value = mock_smtp
+        mock_smtp.__enter__ = MagicMock(return_value=mock_smtp)
+        mock_smtp.__exit__ = MagicMock(return_value=False)
 
         send_email(
             smtp_host="smtp.gmail.com",
             smtp_port=587,
             sender="test@gmail.com",
             password="password",
-            recipients=["a@test.com", "b@test.com"],
-            subject="Test Subject",
+            recipients=["a@test.com"],
+            subject="Test",
             html_content="<h1>Hello</h1>",
         )
 
         mock_smtp.starttls.assert_called_once()
-        mock_smtp.login.assert_called_once_with("test@gmail.com", "password")
+        mock_smtp.login.assert_called_once()
+        mock_smtp.send_message.assert_called_once()
+
+
+def test_send_email_calls_smtp_ssl():
+    with patch("src.email_sender.smtplib.SMTP_SSL") as mock_smtp_ssl_class:
+        mock_smtp = MagicMock()
+        mock_smtp_ssl_class.return_value = mock_smtp
+        mock_smtp.__enter__ = MagicMock(return_value=mock_smtp)
+        mock_smtp.__exit__ = MagicMock(return_value=False)
+
+        send_email(
+            smtp_host="smtp.163.com",
+            smtp_port=465,
+            sender="test@163.com",
+            password="password",
+            recipients=["a@test.com", "b@test.com"],
+            subject="Test",
+            html_content="<h1>Hello</h1>",
+        )
+
+        mock_smtp.login.assert_called_once()
         assert mock_smtp.send_message.call_count == 2

@@ -8,8 +8,8 @@ sources:
     user_agent: "ai-rss-email/1.0"
 
 email:
-  smtp_host: "smtp.gmail.com"
-  smtp_port: 587
+  smtp_host: "smtp.163.com"
+  smtp_port: 465
   recipients:
     - "yangxuerui0103@gmail.com"
     - "yangxuerui0103@163.com"
